@@ -1,10 +1,3 @@
-version: 2.1
-
-executors:
-  linux:
-    docker:
-      - image: ethereum/cpp-build-env:11
-
 defaults:
 
   environment-info: &environment-info
@@ -33,14 +26,14 @@ defaults:
       name: "Install mips64 toolchain"
       command: |
         sudo apt -q update
-        sudo apt -qy install g++-mips64-linux-gnuabi64 qemu-user-static
+        sudo apt -qy install g++-mips64-linux-gnuabi64 qemu
 
   install-powerpc64: &install-powerpc64
     run:
       name: "Install powerpc64 toolchain"
       command: |
         sudo apt -q update
-        sudo apt -qy install g++-powerpc64-linux-gnu qemu-user-static
+        sudo apt -qy install g++-powerpc64-linux-gnu qemu
 
   configure: &configure
     run:
@@ -114,33 +107,35 @@ defaults:
       - run:
           name: "Install CMake"
           command: |
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake ninja
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install -q cmake ninja
       - run:
           name: "Install Python3"
           # Python3 and requests are needed for Hunter upload.
           command: |
             export HOMEBREW_NO_AUTO_UPDATE=1
-            if ! brew install python3; then
-              brew upgrade python
+            if ! brew install -q python3; then
+              brew upgrade -q python
             fi
-            pip3 install -q requests gitpython
+            pip3 install -q requests
       - checkout
       - *configure
       - *build
       - *test
 
 
+version: 2
 jobs:
 
-  linux-gcc-coverage:
+  linux-gcc6-coverage:
     environment:
-      - CXX: g++-8
-      - CC:  gcc-8
-      - GCOV: gcov-8
+      - CXX: g++-6
+      - CC:  gcc-6
+      - GCOV: gcov-6
       - BUILD_PARALLEL_JOBS: 2
       - BUILD_TYPE: Debug
       - CMAKE_OPTIONS: -DCOVERAGE=ON
-    executor: linux
+    docker:
+      - image: ethereum/cpp-build-env
     steps:
       - checkout
       - *configure
@@ -148,14 +143,15 @@ jobs:
       - *test
       - *upload-coverage-data
 
-  linux-clang-ubsan:
+  linux-clang6-ubsan:
     environment:
-      - CXX: clang++-8
-      - CC:  clang-8
+      - CXX: clang++-6.0
+      - CC:  clang-6.0
       - BUILD_PARALLEL_JOBS: 2
       - CMAKE_OPTIONS: -DSANITIZE=undefined,integer,nullability
       - UBSAN_OPTIONS: halt_on_error=1
-    executor: linux
+    docker:
+      - image: ethereum/cpp-build-env
     steps:
       - checkout
       - *configure
@@ -163,30 +159,73 @@ jobs:
       - *test
       - *benchmark
 
-  linux-clang-asan:
+  linux-clang6-asan:
     environment:
-      - CXX: clang++-8
-      - CC:  clang-8
+      - CXX: clang++-6.0
+      - CC:  clang-6.0
       - BUILD_PARALLEL_JOBS: 2
       - CMAKE_OPTIONS: -DSANITIZE=address
       - ASAN_OPTIONS: allocator_may_return_null=1
-    executor: linux
+    docker:
+      - image: ethereum/cpp-build-env
     steps:
       - checkout
       - *configure
       - *build
       - *test
       - *benchmark
+
+  linux-gcc4.8:
+    environment:
+      - CXX: g++-4.8
+      - CC:  gcc-4.8
+      - BUILD_PARALLEL_JOBS: 2
+    docker:
+      - image: ethereum/cpp-build-env
+    steps:
+      - checkout
+      - *configure
+      - *build
+      - *test-cmake-config
+      - *test
+
+  linux-clang3.8:
+    environment:
+      - CXX: clang++-3.8
+      - CC:  clang-3.8
+      - BUILD_PARALLEL_JOBS: 2
+      - CMAKE_OPTIONS: -DETHASH_BUILD_TESTS=OFF
+    docker:
+      - image: ethereum/cpp-build-env
+    steps:
+      - checkout
+      - *configure
+      - *build
+      - *test-cmake-config
 
   linux-32bit-asan:
     environment:
       - BUILD_PARALLEL_JOBS: 2
-      - BUILD_TYPE: RelWithDebInfo
-      - CMAKE_OPTIONS: -DTOOLCHAIN=cxx11-32bit -DSANITIZE=address
+      - CMAKE_OPTIONS: -DTOOLCHAIN=cxx11-32bit
+      - CMAKE_OPTIONS: -DSANITIZE=address
       - GTEST_FILTER: -*_oom
-      - ASAN_OPTIONS: allocator_may_return_null=1
     docker:
-      - image: ethereum/cpp-build-env:12-gcc-9
+      - image: ethereum/cpp-build-env
+    steps:
+      - checkout
+      - *install-m32
+      - *configure
+      - *build
+      - *test
+
+  linux-32bit-ubsan:
+    environment:
+      - BUILD_PARALLEL_JOBS: 2
+      - CMAKE_OPTIONS: -DTOOLCHAIN=cxx11-32bit
+      - CMAKE_OPTIONS: -DSANITIZE=undefined
+      - UBSAN_OPTIONS: halt_on_error=1
+    docker:
+      - image: ethereum/cpp-build-env
     steps:
       - checkout
       - *install-m32
@@ -200,7 +239,7 @@ jobs:
       - TEST_PARALLEL_JOBS: 2
       - CMAKE_OPTIONS: -DTOOLCHAIN=mips64 -DCMAKE_EXE_LINKER_FLAGS=-static
     docker:
-      - image: ethereum/cpp-build-env:12-gcc-9
+      - image: ethereum/cpp-build-env
     steps:
       - checkout
       - *install-mips64
@@ -213,14 +252,15 @@ jobs:
           name: "Test mips64"
           working_directory: ~/build
           command: |  # Software emulation in qemu will not handle threads.
-            qemu-mips64-static test/ethash-test --gtest_filter='-*_multithreaded.*'
+            qemu-mips64 test/ethash-test --gtest_filter='-*_multithreaded.*'
 
   powerpc64:
     environment:
       - BUILD_PARALLEL_JOBS: 2
       - TEST_PARALLEL_JOBS: 2
       - CMAKE_OPTIONS: -DTOOLCHAIN=powerpc64 -DCMAKE_EXE_LINKER_FLAGS=-static
-    executor: linux
+    docker:
+      - image: ethereum/cpp-build-env
     steps:
       - checkout
       - *install-powerpc64
@@ -233,63 +273,8 @@ jobs:
           name: "Test powerpc64"
           working_directory: ~/build
           command: |  # Software emulation in qemu will not handle threads.
-            qemu-ppc64-static test/ethash-test --gtest_filter='-*_multithreaded.*'
+            qemu-ppc64 test/ethash-test --gtest_filter='-*_multithreaded.*'
 
-  linux-release:
-    environment:
-      - CXX: clang++-8
-      - CC:  clang-8
-      - BUILD_PARALLEL_JOBS: 4
-      - CMAKE_OPTIONS: -DETHASH_BUILD_TESTS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DHUNTER_ENABLED=OFF
-    docker:
-      - image: ethereum/cpp-build-env:9
-    steps:
-      - checkout
-      - *configure
-      - *build
-      - persist_to_workspace:
-          root: /tmp/local
-          paths:
-            - "*"
-
-  linux-release-python:
-    docker:
-      - image: quay.io/pypa/manylinux1_x86_64
-    steps:
-      - checkout
-      - attach_workspace:
-          at: ~/project/dist
-      - run:
-          name: "Build wheels"
-          command: sh scripts/ci/python_build_wheels.sh
-      - run:
-          name: "Tag wheels"
-          working_directory: ~/project/dist
-          command: |
-            find -name '*linux_x86_64.whl' -exec auditwheel repair {} \;
-      - store_artifacts:
-          path: ~/project/dist
-          destination: dist
-      - run:
-          name: "Install CMake"
-          command: |
-            export PATH=/opt/python/cp37-cp37m/bin:$PATH
-            pip install cmake
-      - run:
-          name: "Build source dist"
-          command: |
-            export PATH=/opt/python/cp37-cp37m/bin:$PATH
-            ./setup.py sdist
-      - run:
-          name: "Build wheel with CMake build"
-          command: |
-            export PATH=/opt/python/cp37-cp37m/bin:$PATH
-            ./setup.py bdist_wheel
-      - run:
-          name: "Test"
-          command: |
-            export PATH=/opt/python/cp37-cp37m/bin:$PATH
-            ./setup.py test
 
   macos-xcode-tsan:
     <<: *macos-defaults
@@ -298,56 +283,26 @@ jobs:
       - CMAKE_OPTIONS: -DSANITIZE=thread
       - TSAN_OPTIONS: allocator_may_return_null=1
     macos:
-      xcode: "11.3.1"
+      xcode: "10.0.0"
 
-  macos-xcode-old:
+  macos-xcode83:
     <<: *macos-defaults
     macos:
-      xcode: "9.4.1"
-
-  macos-release:
-    environment:
-      - BUILD_PARALLEL_JOBS: 4
-      - CMAKE_OPTIONS: -DETHASH_BUILD_TESTS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=~/project/dist
-    macos:
-      xcode: "11.3.1"
-    steps:
-      - run:
-          name: "Install CMake"
-          command: |
-            which python3
-            ls -l /usr/local/lib
-            ls -l /usr/local/bin
-            pip3 install -q cmake
-      - checkout
-      - *configure
-      - *build
-      - run:
-          name: "Test"
-          command: |
-            ./setup.py test
-      - run:
-          name: "Build wheels"
-          command: sh scripts/ci/python_build_wheels.sh
-      - store_artifacts:
-          path: ~/project/dist
-          destination: dist
+      xcode: "8.3.3"
 
 
 workflows:
   version: 2
   ethash:
     jobs:
-      - linux-gcc-coverage
-      - linux-clang-ubsan
-      - linux-clang-asan
+      - linux-gcc6-coverage
+      - linux-clang6-ubsan
+      - linux-clang6-asan
+      - linux-gcc4.8
+      - linux-clang3.8
       - linux-32bit-asan
+      - linux-32bit-ubsan
       - mips64
       - powerpc64
       - macos-xcode-tsan
-      - macos-xcode-old
-      - linux-release
-      - linux-release-python:
-          requires:
-            - linux-release
-      - macos-release
+      - macos-xcode83

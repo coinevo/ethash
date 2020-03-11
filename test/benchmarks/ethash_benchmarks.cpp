@@ -1,13 +1,14 @@
 // ethash: C/C++ implementation of Ethash, the Ethereum Proof of Work algorithm.
-// Copyright 2018-2019 Pawel Bylica.
-// Licensed under the Apache License, Version 2.0.
+// Copyright 2018 Pawel Bylica.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file.
 
 #include "../unittests/helpers.hpp"
 
-#include <benchmark/benchmark.h>
 #include <ethash/ethash-internal.hpp>
 #include <ethash/keccak.hpp>
 #include <ethash/primes.h>
+
+#include <benchmark/benchmark.h>
 
 
 static void calculate_light_cache_num_items(benchmark::State& state)
@@ -63,19 +64,6 @@ static void light_cache(benchmark::State& state)
     }
 }
 BENCHMARK(light_cache)->Arg(1)->Unit(benchmark::kMillisecond);
-
-
-static void create_context(benchmark::State& state)
-{
-    const int epoch_number = static_cast<int>(state.range(0));
-
-    for (auto _ : state)
-    {
-        ethash::create_epoch_context(epoch_number);
-    }
-}
-BENCHMARK(create_context)->Arg(1)->Unit(benchmark::kMillisecond);
-BENCHMARK(create_context)->Arg(333)->Unit(benchmark::kMillisecond);
 
 
 static void ethash_calculate_dataset_item_512(benchmark::State& state)

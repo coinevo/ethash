@@ -1,16 +1,12 @@
 /* ethash: C/C++ implementation of Ethash, the Ethereum Proof of Work algorithm.
- * Copyright 2018-2019 Pawel Bylica.
- * Licensed under the Apache License, Version 2.0.
+ * Copyright 2018 Pawel Bylica.
+ * Licensed under the Apache License, Version 2.0. See the LICENSE file.
  */
 
 #include <ethash/keccak.h>
 
-#include "../support/attributes.h"
-
-#if _MSC_VER
+#include "support/attributes.h"
 #include <string.h>
-#define __builtin_memcpy memcpy
-#endif
 
 #if _WIN32
 /* On Windows assume little endian. */
@@ -39,7 +35,7 @@ static INLINE ALWAYS_INLINE uint64_t load_le(const uint8_t* data)
        This is great trick because we are violating C/C++ memory alignment
        restrictions with no performance penalty. */
     uint64_t word;
-    __builtin_memcpy(&word, data, sizeof(word));
+    memcpy(&word, data, sizeof(word));
     return to_le64(word);
 }
 

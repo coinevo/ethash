@@ -1,6 +1,6 @@
 // ethash: C/C++ implementation of Ethash, the Ethereum Proof of Work algorithm.
-// Copyright 2018-2019 Pawel Bylica.
-// Licensed under the Apache License, Version 2.0.
+// Copyright 2018 Pawel Bylica.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file.
 
 #include <ethash/bit_manipulation.h>
 #include <ethash/kiss99.hpp>
@@ -28,16 +28,16 @@ TEST(kiss99, generate)
 {
     kiss99 rng;
 
-    EXPECT_EQ(rng(), 769445856u);
-    EXPECT_EQ(rng(), 742012328u);
-    EXPECT_EQ(rng(), 2121196314u);
-    EXPECT_EQ(rng(), 2805620942u);
+    EXPECT_EQ(rng(), 769445856);
+    EXPECT_EQ(rng(), 742012328);
+    EXPECT_EQ(rng(), 2121196314);
+    EXPECT_EQ(rng(), 2805620942);
 
     for (int i = 0; i < 100000 - 5; ++i)
         rng();
 
     // The 100000th number.
-    EXPECT_EQ(rng(), 941074834u);
+    EXPECT_EQ(rng(), 941074834);
 }
 
 TEST(kiss99, compare_with_reference)

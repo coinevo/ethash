@@ -1,6 +1,6 @@
 # ethash: C/C++ implementation of Ethash, the Ethereum Proof of Work algorithm.
-# Copyright 2018-2019 Pawel Bylica.
-# Licensed under the Apache License, Version 2.0.
+# Copyright 2018 Pawel Bylica.
+# Licensed under the Apache License, Version 2.0. See the LICENSE file.
 
 cmake_minimum_required(VERSION 3.5)
 
@@ -13,13 +13,11 @@ include(cmake/cable/bootstrap.cmake)
 include(CableBuildType)
 include(CableCompilerSettings)
 include(CableToolchains)
-include(CMakePackageConfigHelpers)
 include(HunterGate)
 
 include(defaults/HunterCacheServers)
 
 cable_configure_toolchain(DEFAULT cxx11)
-cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release RelWithDebInfo Debug)
 
 if(NOT WIN32)
     # Outside of Windows build only Release packages.
@@ -28,12 +26,14 @@ if(NOT WIN32)
 endif()
 
 HunterGate(
-    URL "https://github.com/cpp-pm/hunter/archive/v0.23.224.tar.gz"
-    SHA1 "18e57a43efc435f2e1dae1291e82e42afbf940be"
+    URL "https://github.com/ruslo/hunter/archive/v0.20.35.tar.gz"
+    SHA1 "6e3cb4c333b76803a83c56fcbca3b0bfd9f96f27"
 )
 
 project(ethash)
-set(PROJECT_VERSION 0.5.1)
+set(PROJECT_VERSION 0.4.1)
+
+cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release RelWithDebInfo Debug)
 
 cable_configure_compiler(NO_STACK_PROTECTION)
 if(CABLE_COMPILER_GNULIKE)
@@ -43,6 +43,9 @@ if(CABLE_COMPILER_GNULIKE)
     option(ETHASH_NATIVE "Build for native CPU" OFF)
     if(ETHASH_NATIVE)
         add_compile_options(-march=native)
+    elseif(NOT CMAKE_CROSSCOMPILING)
+        # Tune for currently most common CPUs (flag not supported in cross compilation).
+        add_compile_options(-mtune=generic)
     endif()
 elseif(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 4)
     # For Win32 builds allow allocating more than 2 GB of memory.
@@ -57,35 +60,9 @@ if(ETHASH_FUZZING)
     add_compile_options(-fno-omit-frame-pointer -fsanitize=fuzzer,undefined,integer -fno-sanitize-recover=all)
 endif()
 
-set(include_dir ${PROJECT_SOURCE_DIR}/include)
-
-add_subdirectory(lib)
+add_subdirectory(lib/ethash)
 
 option(ETHASH_BUILD_TESTS "Build unit tests" ON)
 if(ETHASH_BUILD_TESTS)
     add_subdirectory(test)
-endif()
-
-
-install(
-    DIRECTORY
-    ${include_dir}/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
-
-if(ETHASH_INSTALL_CMAKE_CONFIG)
-    write_basic_package_version_file(ethashConfigVersion.cmake COMPATIBILITY SameMajorVersion)
-    configure_package_config_file(cmake/Config.cmake.in ethashConfig.cmake INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ethash)
-
-    install(
-        EXPORT ethashTargets
-        NAMESPACE ethash::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ethash
-    )
-    install(
-        FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/ethashConfig.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/ethashConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ethash
-    )
 endif()

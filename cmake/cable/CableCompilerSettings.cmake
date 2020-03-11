@@ -32,7 +32,7 @@ macro(cable_configure_compiler)
     if(NOT PROJECT_IS_NESTED)
         # Do this configuration only in the top project.
 
-        cmake_parse_arguments(cable "NO_CONVERSION_WARNINGS;NO_STACK_PROTECTION;NO_PEDANTIC" "" "" ${ARGN})
+        cmake_parse_arguments(cable "NO_CONVERSION_WARNINGS;NO_STACK_PROTECTION" "" "" ${ARGN})
 
         if(cable_UNPARSED_ARGUMENTS)
             message(FATAL_ERROR "cable_configure_compiler: Unknown options: ${cable_UNPARSED_ARGUMENTS}")
@@ -52,12 +52,8 @@ macro(cable_configure_compiler)
 
         if(CABLE_COMPILER_GNULIKE)
 
-            if(NOT cable_NO_PEDANTIC)
-                add_compile_options(-Wpedantic)
-            endif()
-
             # Enable basing warnings set and treat them as errors.
-            add_compile_options(-Werror -Wall -Wextra -Wshadow)
+            add_compile_options(-pedantic -Werror -Wall -Wextra)
 
             if(NOT cable_NO_CONVERSION_WARNINGS)
                 # Enable conversion warnings if not explicitly disabled.
@@ -67,31 +63,7 @@ macro(cable_configure_compiler)
             # Allow unknown pragmas, we don't want to wrap them with #ifdefs.
             add_compile_options(-Wno-unknown-pragmas)
 
-            # Stack protection.
-            check_cxx_compiler_flag(-fstack-protector fstack-protector)
-            if(fstack-protector)
-                # The compiler supports stack protection options.
-                if(cable_NO_STACK_PROTECTION)
-                    # Stack protection explicitly disabled.
-                    # Add "no" flag, because in some configuration the compiler has it enabled by default.
-                    add_compile_options(-fno-stack-protector)
-                else()
-                    # Try enabling the "strong" variant.
-                    cable_add_cxx_compiler_flag_if_supported(-fstack-protector-strong have_stack_protector_strong_support)
-                    if(NOT have_stack_protector_strong_support)
-                        # Fallback to standard variant of "strong" not available.
-                        add_compile_options(-fstack-protector)
-                    endif()
-                endif()
-            endif()
-
-            cable_add_cxx_compiler_flag_if_supported(-Wimplicit-fallthrough)
-
         elseif(MSVC)
-
-            # Get rid of default warning level.
-            string(REPLACE " /W3" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-            string(REPLACE " /W3" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
             # Enable basing warnings set and treat them as errors.
             add_compile_options(/W4 /WX)
@@ -101,18 +73,24 @@ macro(cable_configure_compiler)
 
         endif()
 
-        # Option for arch=native.
-        option(NATIVE "Build for native CPU" OFF)
-        if(NATIVE)
-            if(MSVC)
-                add_compile_options(-arch:AVX)
+        check_cxx_compiler_flag(-fstack-protector fstack-protector)
+        if(fstack-protector)
+            # The compiler supports stack protection options.
+            if(cable_NO_STACK_PROTECTION)
+                # Stack protection explicitly disabled.
+                # Add "no" flag, because in some configuration the compiler has it enabled by default.
+                add_compile_options(-fno-stack-protector)
             else()
-                add_compile_options(-mtune=native -march=native)
+                # Try enabling the "strong" variant.
+                cable_add_cxx_compiler_flag_if_supported(-fstack-protector-strong have_stack_protector_strong_support)
+                if(NOT have_stack_protector_strong_support)
+                    # Fallback to standard variant of "strong" not available.
+                    add_compile_options(-fstack-protector)
+                endif()
             endif()
-        elseif(NOT MSVC)
-            # Tune for currently most common CPUs.
-            cable_add_cxx_compiler_flag_if_supported(-mtune=generic)
         endif()
+
+        cable_add_cxx_compiler_flag_if_supported(-Wimplicit-fallthrough)
 
         # Sanitizers support.
         set(SANITIZE OFF CACHE STRING "Build with the specified sanitizer")

@@ -1,6 +1,6 @@
 // ethash: C/C++ implementation of Ethash, the Ethereum Proof of Work algorithm.
-// Copyright 2018-2019 Pawel Bylica.
-// Licensed under the Apache License, Version 2.0.
+// Copyright 2018 Pawel Bylica.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file.
 
 #include "ethash-internal.hpp"
 
@@ -19,8 +19,8 @@
 #define ATTRIBUTE_NOINLINE
 #endif
 
-using namespace ethash;
-
+namespace ethash
+{
 namespace
 {
 std::mutex shared_context_mutex;
@@ -80,20 +80,21 @@ void update_local_context_full(int epoch_number)
 }
 }  // namespace
 
-const ethash_epoch_context* ethash_get_global_epoch_context(int epoch_number) noexcept
+const epoch_context& get_global_epoch_context(int epoch_number)
 {
     // Check if local context matches epoch number.
     if (!thread_local_context || thread_local_context->epoch_number != epoch_number)
         update_local_context(epoch_number);
 
-    return thread_local_context.get();
+    return *thread_local_context;
 }
 
-const ethash_epoch_context_full* ethash_get_global_epoch_context_full(int epoch_number) noexcept
+const epoch_context_full& get_global_epoch_context_full(int epoch_number)
 {
     // Check if local context matches epoch number.
     if (!thread_local_context_full || thread_local_context_full->epoch_number != epoch_number)
         update_local_context_full(epoch_number);
 
-    return thread_local_context_full.get();
+    return *thread_local_context_full;
 }
+}  // namespace ethash
